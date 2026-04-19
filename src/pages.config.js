@@ -1,3 +1,4 @@
+import Administracion from './pages/Administracion';
 import Ajustes from './pages/Ajustes';
 import Configuracion from './pages/Configuracion';
 import ConfigurarPipeline from './pages/ConfigurarPipeline';
@@ -25,6 +26,7 @@ import VentasDashboard from './pages/VentasDashboard';
 import __Layout from './Layout.jsx';
 
 export const PAGES = {
+    "Administracion": Administracion,
     "Ajustes": Ajustes,
     "Configuracion": Configuracion,
     "ConfigurarPipeline": ConfigurarPipeline,

@@ -1,39 +1,51 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { supabase } from "@/api/supabaseClient";
+import { TBL } from "@/api/entityApi";
+import { useAuth } from "@/lib/AuthContext";
+import { Button } from "@/components/ui/button";
 
 const WorkspaceContext = createContext(null);
 
 export function WorkspaceProvider({ children }) {
+  const { isLoadingAuth, isAuthenticated, user } = useAuth();
   const [workspace, setWorkspace] = useState(null);
   const [workspaceMember, setWorkspaceMember] = useState(null);
   const [workspaceLoading, setWorkspaceLoading] = useState(true);
 
-  useEffect(() => {
-    bootstrapWorkspace();
-  }, []);
-
-  const bootstrapWorkspace = async () => {
+  const bootstrapWorkspace = useCallback(async () => {
+    setWorkspaceLoading(true);
     try {
       const {
-        data: { user },
+        data: { user: u },
       } = await supabase.auth.getUser();
-      if (!user) {
-        setWorkspaceLoading(false);
+      if (!u) {
+        setWorkspace(null);
+        setWorkspaceMember(null);
         return;
       }
 
       const { data: wid, error: rpcErr } = await supabase.rpc("ensure_workspace");
       if (rpcErr) throw rpcErr;
 
-      const { data: ws, error: wsErr } = await supabase.from("workspaces").select("*").eq("id", wid).single();
+      if (!wid) {
+        setWorkspace(null);
+        setWorkspaceMember(null);
+        return;
+      }
+
+      const { data: ws, error: wsErr } = await supabase
+        .from(TBL.workspaces)
+        .select("*")
+        .eq("id", wid)
+        .single();
       if (wsErr) throw wsErr;
       setWorkspace(ws);
 
       const { data: mem } = await supabase
-        .from("workspace_members")
+        .from(TBL.workspace_members)
         .select("*")
         .eq("workspace_id", wid)
-        .eq("user_id", user.id)
+        .eq("user_id", u.id)
         .maybeSingle();
       setWorkspaceMember(mem || null);
     } catch (err) {
@@ -41,9 +53,20 @@ export function WorkspaceProvider({ children }) {
     } finally {
       setWorkspaceLoading(false);
     }
-  };
+  }, []);
 
-  if (workspaceLoading) {
+  useEffect(() => {
+    if (isLoadingAuth) return;
+    if (!isAuthenticated) {
+      setWorkspaceLoading(false);
+      setWorkspace(null);
+      setWorkspaceMember(null);
+      return;
+    }
+    bootstrapWorkspace();
+  }, [isLoadingAuth, isAuthenticated, user?.id, bootstrapWorkspace]);
+
+  if (isLoadingAuth || workspaceLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-3">
@@ -54,12 +77,28 @@ export function WorkspaceProvider({ children }) {
     );
   }
 
+  if (!workspace && !user?.isPlatformAdmin) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
+        <div className="max-w-md text-center space-y-4">
+          <h1 className="text-lg font-semibold text-slate-900">Sin acceso asignado</h1>
+          <p className="text-sm text-slate-600">
+            Tu cuenta no está asociada a ningún equipo. Pedí acceso al administrador de la plataforma.
+          </p>
+          <Button variant="outline" onClick={() => supabase.auth.signOut({ scope: "local" })}>
+            Cerrar sesión
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <WorkspaceContext.Provider
       value={{
         workspace,
         workspaceMember,
-        workspaceLoading,
+        workspaceLoading: false,
         isAdmin: workspaceMember?.role === "admin",
         refetchWorkspace: bootstrapWorkspace,
       }}

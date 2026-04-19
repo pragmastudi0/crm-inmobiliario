@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { supabase } from '@/api/supabaseClient';
+import { TBL } from '@/api/entityApi';
 
 const AuthContext = createContext();
 
@@ -22,12 +23,13 @@ export const AuthProvider = ({ children }) => {
         }
         return;
       }
-      const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+      const { data: profile } = await supabase.from(TBL.profiles).select('*').eq('id', session.user.id).maybeSingle();
       if (!mounted) return;
       setUser({
         id: session.user.id,
         email: session.user.email,
         full_name: profile?.full_name,
+        isPlatformAdmin: profile?.is_platform_admin ?? false,
         consulta_follow_up_days: profile?.consulta_follow_up_days,
         postventa_follow_up_days: profile?.postventa_follow_up_days,
       });
@@ -75,11 +77,12 @@ export const AuthProvider = ({ children }) => {
       data: { session },
     } = await supabase.auth.getSession();
     if (session?.user) {
-      const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+      const { data: profile } = await supabase.from(TBL.profiles).select('*').eq('id', session.user.id).maybeSingle();
       setUser({
         id: session.user.id,
         email: session.user.email,
         full_name: profile?.full_name,
+        isPlatformAdmin: profile?.is_platform_admin ?? false,
         consulta_follow_up_days: profile?.consulta_follow_up_days,
         postventa_follow_up_days: profile?.postventa_follow_up_days,
       });
