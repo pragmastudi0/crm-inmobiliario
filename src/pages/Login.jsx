@@ -9,7 +9,6 @@ import { toast } from "sonner";
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [mode, setMode] = useState("signin");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -20,23 +19,13 @@ export default function Login() {
     }
     setLoading(true);
     try {
-      if (mode === "signin") {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
-        });
-        if (error) throw error;
-        toast.success("Sesión iniciada");
-        window.location.href = "/";
-      } else {
-        const { error } = await supabase.auth.signUp({
-          email: email.trim(),
-          password,
-          options: { emailRedirectTo: `${window.location.origin}/` },
-        });
-        if (error) throw error;
-        toast.success("Revisá tu correo para confirmar la cuenta (si está habilitado en Supabase).");
-      }
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (error) throw error;
+      toast.success("Sesión iniciada");
+      window.location.href = "/";
     } catch (err) {
       toast.error(err.message || "Error de autenticación");
     } finally {
@@ -50,7 +39,7 @@ export default function Login() {
         <CardHeader>
           <CardTitle className="text-2xl">PRAGMA CRM</CardTitle>
           <CardDescription>
-            {mode === "signin" ? "Iniciá sesión" : "Creá una cuenta"}
+            Iniciá sesión. El alta de usuarios la gestiona un administrador (invitación por correo).
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -71,21 +60,13 @@ export default function Login() {
               <Input
                 id="password"
                 type="password"
-                autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Procesando…" : mode === "signin" ? "Entrar" : "Registrarme"}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              className="w-full"
-              onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-            >
-              {mode === "signin" ? "¿No tenés cuenta? Registrate" : "¿Ya tenés cuenta? Entrá"}
+              {loading ? "Procesando…" : "Entrar"}
             </Button>
           </form>
         </CardContent>

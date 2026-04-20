@@ -1,5 +1,5 @@
 import { supabase } from '@/api/supabaseClient';
-import { entities } from '@/api/entityApi';
+import { entities, TBL } from '@/api/entityApi';
 
 export async function inviteWorkspaceMember({ email, role, workspaceId }) {
   const { data, error } = await supabase.functions.invoke('invite-workspace-member', {
@@ -27,11 +27,12 @@ export const api = {
         err.status = 401;
         throw err;
       }
-      const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+      const { data: profile } = await supabase.from(TBL.profiles).select('*').eq('id', user.id).maybeSingle();
       return {
         id: user.id,
         email: user.email,
         full_name: profile?.full_name,
+        is_platform_admin: profile?.is_platform_admin ?? false,
         consulta_follow_up_days: profile?.consulta_follow_up_days,
         postventa_follow_up_days: profile?.postventa_follow_up_days,
       };
@@ -48,7 +49,7 @@ export const api = {
       if (patch.postventa_follow_up_days !== undefined) {
         allowed.postventa_follow_up_days = Number(patch.postventa_follow_up_days);
       }
-      const { error } = await supabase.from('profiles').update(allowed).eq('id', user.id);
+      const { error } = await supabase.from(TBL.profiles).update(allowed).eq('id', user.id);
       if (error) throw error;
     },
     async logout(redirect) {

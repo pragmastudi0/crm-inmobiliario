@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
     const admin = createClient(supabaseUrl, serviceKey);
 
     const { data: mem, error: memErr } = await admin
-      .from("workspace_members")
+      .from("crm_inmobiliario_workspace_members")
       .select("role")
       .eq("workspace_id", workspace_id)
       .eq("user_id", user.id)
@@ -67,13 +67,13 @@ Deno.serve(async (req) => {
     const emailNorm = String(email).trim().toLowerCase();
 
     const { data: existingProfile } = await admin
-      .from("profiles")
+      .from("crm_inmobiliario_profiles")
       .select("id")
       .eq("email", emailNorm)
       .maybeSingle();
 
     if (existingProfile?.id) {
-      const { error: insErr } = await admin.from("workspace_members").upsert(
+      const { error: insErr } = await admin.from("crm_inmobiliario_workspace_members").upsert(
         {
           workspace_id,
           user_id: existingProfile.id,
@@ -87,9 +87,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    await admin.from("workspace_pending_invites").delete().eq("workspace_id", workspace_id).eq("email", emailNorm);
+    await admin
+      .from("crm_inmobiliario_workspace_pending_invites")
+      .delete()
+      .eq("workspace_id", workspace_id)
+      .eq("email", emailNorm);
     const { error: pendErr } = await admin
-      .from("workspace_pending_invites")
+      .from("crm_inmobiliario_workspace_pending_invites")
       .insert({ workspace_id, email: emailNorm, role: r });
     if (pendErr) throw pendErr;
 

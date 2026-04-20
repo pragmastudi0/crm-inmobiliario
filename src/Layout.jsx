@@ -2,8 +2,9 @@ import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { 
   LayoutDashboard, Kanban, List, Users, Calendar,
-  Menu, X, CheckCircle2, PanelLeftClose, PanelLeftOpen, Settings, Home
+  Menu, X, CheckCircle2, PanelLeftClose, PanelLeftOpen, Settings, Home, Shield
 } from "lucide-react";
+import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -23,8 +24,17 @@ const NAV_ITEMS = [
 ];
 
 export default function Layout({ children, currentPageName }) {
+  const { user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  const navItems = user?.isPlatformAdmin
+    ? [
+        ...NAV_ITEMS.slice(0, 1),
+        { name: "Administración", icon: Shield, page: "Administracion" },
+        ...NAV_ITEMS.slice(1),
+      ]
+    : NAV_ITEMS;
 
 
 
@@ -91,7 +101,7 @@ export default function Layout({ children, currentPageName }) {
         </div>
 
         <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-1">
-          {NAV_ITEMS.map((item) => {
+          {navItems.map((item) => {
             const isActive = currentPageName === item.page;
             return (
               <Link
