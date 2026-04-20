@@ -29,11 +29,7 @@ export default function Layout({ children, currentPageName }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const navItems = user?.isPlatformAdmin
-    ? [
-        ...NAV_ITEMS.slice(0, 1),
-        { name: "Administración", icon: Shield, page: "Administracion" },
-        ...NAV_ITEMS.slice(1),
-      ]
+    ? [{ name: "Administración", icon: Shield, page: "Administracion" }]
     : NAV_ITEMS;
 
 

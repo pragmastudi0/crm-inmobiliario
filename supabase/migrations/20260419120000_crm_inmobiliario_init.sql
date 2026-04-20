@@ -48,19 +48,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION public.current_is_platform_admin()
-RETURNS boolean
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT COALESCE(
-    (SELECT p.is_platform_admin FROM public.crm_inmobiliario_profiles p WHERE p.id = auth.uid()),
-    false
-  );
-$$;
-
 -- ---------------------------------------------------------------------------
 -- Core tables
 -- ---------------------------------------------------------------------------
@@ -354,6 +341,19 @@ CREATE TRIGGER on_auth_user_created_pragma
 -- ---------------------------------------------------------------------------
 -- RLS helpers
 -- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.current_is_platform_admin()
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT COALESCE(
+    (SELECT p.is_platform_admin FROM public.crm_inmobiliario_profiles p WHERE p.id = auth.uid()),
+    false
+  );
+$$;
+
 CREATE OR REPLACE FUNCTION public.user_workspace_ids()
 RETURNS setof uuid
 LANGUAGE sql

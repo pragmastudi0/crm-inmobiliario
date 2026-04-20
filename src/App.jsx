@@ -32,8 +32,9 @@ function LoginRoute() {
 }
 
 function ProtectedRoutes() {
-  const { isLoadingAuth, isAuthenticated } = useAuth();
+  const { isLoadingAuth, isAuthenticated, user } = useAuth();
   const location = useLocation();
+  const isPlatformAdmin = !!user?.isPlatformAdmin;
 
   if (isLoadingAuth) {
     return (
@@ -47,24 +48,45 @@ function ProtectedRoutes() {
     return <Navigate to="/Login" replace state={{ from: location.pathname }} />;
   }
 
+  if (isPlatformAdmin) {
+    const AdminPage = Pages.Administracion;
+    return (
+      <Routes>
+        <Route path="/" element={<Navigate to="/Administracion" replace />} />
+        <Route
+          path="/Administracion"
+          element={
+            <LayoutWrapper currentPageName="Administracion">
+              <AdminPage />
+            </LayoutWrapper>
+          }
+        />
+        <Route path="*" element={<Navigate to="/Administracion" replace />} />
+      </Routes>
+    );
+  }
+
   return (
     <Routes>
+      <Route path="/Administracion" element={<Navigate to="/" replace />} />
       <Route path="/" element={
         <LayoutWrapper currentPageName={mainPageKey}>
           <MainPage />
         </LayoutWrapper>
       } />
-      {Object.entries(Pages).map(([path, Page]) => (
-        <Route
-          key={path}
-          path={`/${path}`}
-          element={
-            <LayoutWrapper currentPageName={path}>
-              <Page />
-            </LayoutWrapper>
-          }
-        />
-      ))}
+      {Object.entries(Pages)
+        .filter(([path]) => path !== 'Administracion')
+        .map(([path, Page]) => (
+          <Route
+            key={path}
+            path={`/${path}`}
+            element={
+              <LayoutWrapper currentPageName={path}>
+                <Page />
+              </LayoutWrapper>
+            }
+          />
+        ))}
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
