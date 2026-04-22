@@ -33,7 +33,7 @@ export function WorkspaceProvider({ children }) {
         setWorkspaceMember(null);
         const noticeKey = `crm-no-workspace-notice-${u.id}`;
         if (!user?.isPlatformAdmin && !sessionStorage.getItem(noticeKey)) {
-          toast.info("Inicio de sesión correcto. Pedí acceso al administrador para que te asigne un equipo.");
+          toast.info("Acceso correcto. Pedí acceso al administrador para que te asigne un equipo.");
           sessionStorage.setItem(noticeKey, "shown");
         }
         return;
