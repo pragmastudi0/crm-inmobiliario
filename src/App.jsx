@@ -7,6 +7,7 @@ import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'r
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import Login from '@/pages/Login';
+import { Toaster as SonnerToaster } from 'sonner';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -103,6 +104,7 @@ function App() {
             <Route path="*" element={<ProtectedRoutes />} />
           </Routes>
           <Toaster />
+          <SonnerToaster position="top-right" richColors />
         </Router>
       </QueryClientProvider>
     </AuthProvider>
