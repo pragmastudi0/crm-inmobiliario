@@ -1,15 +1,12 @@
+import { GOOGLE_CALENDAR_OAUTH_CLIENT_ID } from '@/lib/googleCalendarClientId';
+
 const SCOPES = 'https://www.googleapis.com/auth/calendar.events';
 const TOKEN_KEY = 'gcal_token';
 const TOKEN_EXPIRY_KEY = 'gcal_token_expiry';
-const CLIENT_ID_KEY = 'gcal_client_id';
 const EMAIL_KEY = 'gcal_user_email';
 
 export function getClientId() {
-  return localStorage.getItem(CLIENT_ID_KEY) || '';
-}
-
-export function saveClientId(clientId) {
-  localStorage.setItem(CLIENT_ID_KEY, clientId);
+  return GOOGLE_CALENDAR_OAUTH_CLIENT_ID;
 }
 
 export function getConnectedEmail() {
@@ -72,7 +69,7 @@ export async function connectGoogleCalendar(clientId) {
 export async function connect() {
   const id = getClientId();
   if (!id) {
-    throw new Error('Configurá el Google Client ID antes de conectar');
+    throw new Error('Falta la configuración de Google OAuth en la aplicación');
   }
   return connectGoogleCalendar(id);
 }
