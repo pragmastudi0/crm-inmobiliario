@@ -8,7 +8,6 @@ import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { Toaster } from "sonner";
 import { WorkspaceProvider } from "@/components/context/WorkspaceContext";
 
 const NAV_ITEMS = [
@@ -37,8 +36,6 @@ export default function Layout({ children, currentPageName }) {
   return (
     <WorkspaceProvider>
       <div className="min-h-screen bg-slate-50">
-      <Toaster position="top-right" richColors />
-      
       {/* Mobile Header */}
       <header className="lg:hidden bg-white border-b border-slate-100 px-4 py-3 flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center gap-3">
