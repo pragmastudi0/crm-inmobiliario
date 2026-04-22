@@ -47,7 +47,27 @@ export async function connectGoogleCalendar(clientId) {
       client_id: clientId,
       scope: SCOPES,
       callback: async (response) => {
-        if (response.error) return reject(response);
+        if (response.error) {
+          const errCode = response.error;
+          const errDesc = response.error_description || '';
+          if (
+            errCode === 'invalid_client' ||
+            /invalid_client|OAuth client was not found/i.test(String(errDesc))
+          ) {
+            return reject(
+              new Error(
+                'Google no reconoce este Client ID (invalid_client). En Google Cloud Console verificá que exista un cliente OAuth tipo "Aplicación web" con exactamente este ID, que el proyecto esté activo y que en el deploy no haya un VITE_GOOGLE_OAUTH_CLIENT_ID incorrecto.'
+              )
+            );
+          }
+          return reject(
+            new Error(
+              typeof errDesc === 'string' && errDesc
+                ? errDesc
+                : errCode || 'Error de autorización con Google'
+            )
+          );
+        }
         const expiry = Date.now() + (response.expires_in - 60) * 1000;
         localStorage.setItem(TOKEN_KEY, response.access_token);
         localStorage.setItem(TOKEN_EXPIRY_KEY, expiry.toString());
