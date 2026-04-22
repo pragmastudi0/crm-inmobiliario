@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/AuthContext";
+import { CRM_APP_SLUG } from "@/api/entityApi";
 
 export default function Login() {
   const { authError } = useAuth();
@@ -28,6 +29,11 @@ export default function Login() {
         const { data, error } = await supabase.auth.signUp({
           email: emailNormalized,
           password,
+          options: {
+            data: {
+              app_slug: CRM_APP_SLUG,
+            },
+          },
         });
         if (error) throw error;
 
