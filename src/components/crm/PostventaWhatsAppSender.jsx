@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { MessageCircle, Copy, ExternalLink, Check, Sparkles } from "lucide-react";
 import { api } from "@/api/client";
 import { toast } from "sonner";
+import { useWorkspace } from "@/components/context/WorkspaceContext";
 
 function addBusinessDays(date, days) {
   const result = new Date(date);
@@ -21,6 +22,7 @@ function addBusinessDays(date, days) {
 }
 
 export default function PostventaWhatsAppSender({ open, onOpenChange, venta, contactoWhatsapp, onMessageSent }) {
+  const { workspace } = useWorkspace();
   const [plantillas, setPlantillas] = useState([]);
   const [variablesDB, setVariablesDB] = useState([]);
   const [selectedPlantilla, setSelectedPlantilla] = useState(null);
@@ -39,9 +41,10 @@ export default function PostventaWhatsAppSender({ open, onOpenChange, venta, con
   }, [selectedPlantilla, venta, variablesDB]);
 
   const loadData = async () => {
+    if (!workspace?.id) return;
     const [allPlantillas, vars] = await Promise.all([
-      api.entities.PlantillaWhatsApp.filter({ activa: true }),
-      api.entities.VariablePlantilla.list()
+      api.entities.PlantillaWhatsApp.filter({ workspace_id: workspace.id, activa: true }),
+      api.entities.VariablePlantilla.list("-updated_date", 500, { workspace_id: workspace.id })
     ]);
     setVariablesDB(vars);
     const postventa = allPlantillas.filter(p => p.etapa === 'Postventa');

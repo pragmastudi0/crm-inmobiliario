@@ -4,6 +4,7 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+const APP_SLUG = "crm-inmobiliario";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -51,6 +52,7 @@ Deno.serve(async (req) => {
     const { data: mem, error: memErr } = await admin
       .from("crm_inmobiliario_workspace_members")
       .select("role")
+      .eq("app_slug", APP_SLUG)
       .eq("workspace_id", workspace_id)
       .eq("user_id", user.id)
       .maybeSingle();
@@ -69,12 +71,14 @@ Deno.serve(async (req) => {
     const { data: existingProfile } = await admin
       .from("crm_inmobiliario_profiles")
       .select("id")
+      .eq("app_slug", APP_SLUG)
       .eq("email", emailNorm)
       .maybeSingle();
 
     if (existingProfile?.id) {
       const { error: insErr } = await admin.from("crm_inmobiliario_workspace_members").upsert(
         {
+          app_slug: APP_SLUG,
           workspace_id,
           user_id: existingProfile.id,
           role: r,
@@ -90,11 +94,12 @@ Deno.serve(async (req) => {
     await admin
       .from("crm_inmobiliario_workspace_pending_invites")
       .delete()
+      .eq("app_slug", APP_SLUG)
       .eq("workspace_id", workspace_id)
       .eq("email", emailNorm);
     const { error: pendErr } = await admin
       .from("crm_inmobiliario_workspace_pending_invites")
-      .insert({ workspace_id, email: emailNorm, role: r });
+      .insert({ app_slug: APP_SLUG, workspace_id, email: emailNorm, role: r });
     if (pendErr) throw pendErr;
 
     const origin = req.headers.get("origin") || "";

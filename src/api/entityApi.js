@@ -22,6 +22,39 @@ export const TBL = {
   mensajes: 'crm_inmobiliario_mensajes',
 };
 
+export const CRM_APP_SLUG = 'crm-inmobiliario';
+
+const WORKSPACE_SCOPED_TABLES = new Set([
+  TBL.pipeline_stages,
+  TBL.tags,
+  TBL.custom_fields,
+  TBL.workspace_settings,
+  TBL.workspace_members,
+  TBL.consultas,
+  TBL.contactos,
+  TBL.ventas,
+  TBL.properties,
+  TBL.proveedores,
+  TBL.listas_whatsapp,
+  TBL.plantillas_whatsapp,
+  TBL.variable_plantilla,
+  TBL.mensajes,
+]);
+
+function ensureWorkspaceScope(table, filters = {}) {
+  if (!WORKSPACE_SCOPED_TABLES.has(table)) return;
+  const hasScope =
+    !!filters?.workspace_id ||
+    !!filters?.id ||
+    !!filters?.consultaId ||
+    !!filters?.contactoId ||
+    !!filters?.proveedorId ||
+    !!filters?.propietarioId;
+  if (!hasScope) {
+    throw new Error(`workspace_id requerido para consultar ${table}`);
+  }
+}
+
 const META_KEYS = new Set([
   'id',
   'workspace_id',
@@ -133,6 +166,7 @@ function applyDocFilters(q, filters, options = {}) {
 function makeDocEntity(table, { workspaceOptional = false } = {}) {
   return {
     async filter(filters = {}, order, limit = 2000) {
+      if (!workspaceOptional) ensureWorkspaceScope(table, filters);
       let q = supabase.from(table).select('*');
       q = applyDocFilters(q, filters, { table });
       q = applyOrder(q, table, order);
@@ -141,8 +175,8 @@ function makeDocEntity(table, { workspaceOptional = false } = {}) {
       if (error) throw error;
       return (data || []).map(fromDocRow);
     },
-    async list(order, limit = 500, _extra) {
-      return this.filter({}, order, limit);
+    async list(order, limit = 500, extraFilters = {}) {
+      return this.filter(extraFilters, order, limit);
     },
     async create(payload) {
       const ws = payload.workspace_id;
@@ -178,6 +212,7 @@ function makeDocEntity(table, { workspaceOptional = false } = {}) {
 function makeFlatEntity(table) {
   return {
     async filter(filters = {}, order, limit = 2000) {
+      ensureWorkspaceScope(table, filters);
       let q = supabase.from(table).select('*');
       for (const [k, v] of Object.entries(filters)) {
         if (v === undefined) continue;
@@ -189,8 +224,8 @@ function makeFlatEntity(table) {
       if (error) throw error;
       return (data || []).map(fromFlatRow);
     },
-    async list(order, limit = 500) {
-      return this.filter({}, order, limit);
+    async list(order, limit = 500, extraFilters = {}) {
+      return this.filter(extraFilters, order, limit);
     },
     async create(payload) {
       const { data, error } = await supabase.from(table).insert(payload).select('*').single();
@@ -213,8 +248,10 @@ const ventasDocEntity = makeDocEntity(TBL.ventas);
 
 const ventaApi = {
   async filter(filters = {}, order, limit = 2000) {
+    ensureWorkspaceScope(TBL.ventas, filters);
     if (isVentaMongoQuery(filters)) {
       let q = supabase.from(TBL.ventas).select('*');
+      q = applyDocFilters(q, filters, { table: TBL.ventas });
       q = applyOrder(q, TBL.ventas, order || '-fecha');
       q = q.limit(Math.min(limit || 5000, 10000));
       const { data, error } = await q;
@@ -229,8 +266,8 @@ const ventaApi = {
     if (error) throw error;
     return (data || []).map(fromDocRow);
   },
-  async list(order, limit = 500, _extra) {
-    return this.filter({}, order, limit);
+  async list(order, limit = 500, extraFilters = {}) {
+    return this.filter(extraFilters, order, limit);
   },
   async create(payload) {
     return ventasDocEntity.create(payload);
@@ -255,8 +292,12 @@ const ventaApi = {
   },
 };
 
-async function listWorkspaceUserProfiles() {
-  const { data: members, error } = await supabase.from(TBL.workspace_members).select('user_id');
+async function listWorkspaceUserProfiles(workspaceId) {
+  if (!workspaceId) throw new Error('workspace_id requerido para listar usuarios');
+  const { data: members, error } = await supabase
+    .from(TBL.workspace_members)
+    .select('user_id')
+    .eq('workspace_id', workspaceId);
   if (error) throw error;
   const ids = [...new Set((members || []).map((m) => m.user_id))];
   if (!ids.length) return [];
@@ -308,6 +349,6 @@ export const entities = {
   },
   WorkspaceSettings: makeFlatEntity(TBL.workspace_settings),
   User: {
-    list: listWorkspaceUserProfiles,
+    list: ({ workspace_id }) => listWorkspaceUserProfiles(workspace_id),
   },
 };

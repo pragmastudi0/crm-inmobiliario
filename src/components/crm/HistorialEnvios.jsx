@@ -4,22 +4,27 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { History } from "lucide-react";
 import moment from "moment";
+import { useWorkspace } from "@/components/context/WorkspaceContext";
 
 export default function HistorialEnvios({ contactoId, consultaId }) {
+  const { workspace } = useWorkspace();
   const { data: envios = [] } = useQuery({
-    queryKey: ['envios-whatsapp', contactoId, consultaId],
+    queryKey: ['envios-whatsapp', workspace?.id, contactoId, consultaId],
     queryFn: async () => {
-      let query = { contactoId };
+      if (!workspace?.id) return [];
+      let query = { workspace_id: workspace.id, contactoId };
       if (consultaId) {
         query.consultaId = consultaId;
       }
       return await api.entities.EnvioWhatsApp.filter(query, "-created_date", 100);
-    }
+    },
+    enabled: !!workspace?.id,
   });
 
   const { data: listas = [] } = useQuery({
-    queryKey: ['listas-whatsapp-map'],
-    queryFn: () => api.entities.ListaWhatsApp.list("-updated_date", 1000)
+    queryKey: ['listas-whatsapp-map', workspace?.id],
+    queryFn: () => (workspace?.id ? api.entities.ListaWhatsApp.list("-updated_date", 1000, { workspace_id: workspace.id }) : []),
+    enabled: !!workspace?.id,
   });
 
   const getListaNombre = (listaId) => {

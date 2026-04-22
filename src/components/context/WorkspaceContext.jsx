@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { supabase } from "@/api/supabaseClient";
-import { TBL } from "@/api/entityApi";
+import { CRM_APP_SLUG, TBL } from "@/api/entityApi";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 
@@ -37,6 +37,7 @@ export function WorkspaceProvider({ children }) {
         .from(TBL.workspaces)
         .select("*")
         .eq("id", wid)
+        .eq("app_slug", CRM_APP_SLUG)
         .single();
       if (wsErr) throw wsErr;
       setWorkspace(ws);
@@ -46,6 +47,7 @@ export function WorkspaceProvider({ children }) {
         .select("*")
         .eq("workspace_id", wid)
         .eq("user_id", u.id)
+        .eq("app_slug", CRM_APP_SLUG)
         .maybeSingle();
       setWorkspaceMember(mem || null);
     } catch (err) {
