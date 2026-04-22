@@ -2,13 +2,12 @@ import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { 
   LayoutDashboard, Kanban, List, Users, Calendar,
-  Menu, X, CheckCircle2, PanelLeftClose, PanelLeftOpen, Settings, Home, Shield
+  Menu, X, CheckCircle2, PanelLeftClose, PanelLeftOpen, Settings, Home, Shield, LogOut
 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { Toaster } from "sonner";
 import { WorkspaceProvider } from "@/components/context/WorkspaceContext";
 
 const NAV_ITEMS = [
@@ -24,7 +23,7 @@ const NAV_ITEMS = [
 ];
 
 export default function Layout({ children, currentPageName }) {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -37,8 +36,6 @@ export default function Layout({ children, currentPageName }) {
   return (
     <WorkspaceProvider>
       <div className="min-h-screen bg-slate-50">
-      <Toaster position="top-right" richColors />
-      
       {/* Mobile Header */}
       <header className="lg:hidden bg-white border-b border-slate-100 px-4 py-3 flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center gap-3">
@@ -136,6 +133,14 @@ export default function Layout({ children, currentPageName }) {
       <main className={cn("transition-all duration-300", sidebarCollapsed ? "lg:ml-16" : "lg:ml-64")}>
         {children}
       </main>
+      <Button
+        variant="secondary"
+        className="fixed left-4 bottom-4 z-40 gap-2"
+        onClick={() => logout(true)}
+      >
+        <LogOut className="w-4 h-4" />
+        Cerrar sesión
+      </Button>
       </div>
     </WorkspaceProvider>
   );

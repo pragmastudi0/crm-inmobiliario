@@ -3,6 +3,7 @@ import { supabase } from "@/api/supabaseClient";
 import { CRM_APP_SLUG, TBL } from "@/api/entityApi";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 const WorkspaceContext = createContext(null);
 
@@ -30,6 +31,11 @@ export function WorkspaceProvider({ children }) {
       if (!wid) {
         setWorkspace(null);
         setWorkspaceMember(null);
+        const noticeKey = `crm-no-workspace-notice-${u.id}`;
+        if (!user?.isPlatformAdmin && !sessionStorage.getItem(noticeKey)) {
+          toast.info("Acceso correcto. Pedí acceso al administrador para que te asigne un equipo.");
+          sessionStorage.setItem(noticeKey, "shown");
+        }
         return;
       }
 
@@ -91,6 +97,13 @@ export function WorkspaceProvider({ children }) {
             Cerrar sesión
           </Button>
         </div>
+        <Button
+          variant="secondary"
+          className="fixed left-4 bottom-4"
+          onClick={() => supabase.auth.signOut({ scope: "local" })}
+        >
+          Cerrar sesión
+        </Button>
       </div>
     );
   }
