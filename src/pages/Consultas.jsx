@@ -22,6 +22,7 @@ import DetalleConsultaDialog from "@/components/crm/DetalleConsultaDialog";
 import DialogSelectorListasWhatsApp from "@/components/crm/DialogSelectorListasWhatsApp";
 import OperacionForm from "@/components/ventas/OperacionForm";
 import { toast } from "sonner";
+import { syncConsultaProximoSeguimientoToGoogle } from "@/lib/syncConsultaGoogleCalendar";
 
 const etapaColors = {
   "Nuevo lead": "bg-blue-100 text-blue-700",
@@ -149,6 +150,20 @@ export default function Consultas() {
   const handleSeguimiento = async (consulta, dias) => {
     const fecha = moment().add(dias, 'days').format("YYYY-MM-DD");
     await updateMutation.mutateAsync({ id: consulta.id, data: { proximoSeguimiento: fecha } });
+    const syncRes = await syncConsultaProximoSeguimientoToGoogle(
+      { ...consulta, proximoSeguimiento: fecha },
+      fecha
+    );
+    if (!syncRes.ok && !syncRes.skipped) {
+      toast.error("No se pudo actualizar el evento en Google Calendar");
+      if (syncRes.notFound) {
+        try {
+          await api.entities.Consulta.update(consulta.id, { googleCalendarEventId: null });
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
     toast.success(`Seguimiento agendado para ${moment(fecha).format("DD/MM")}`);
   };
 

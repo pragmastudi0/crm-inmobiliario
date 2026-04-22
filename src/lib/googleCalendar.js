@@ -131,3 +131,61 @@ export async function createCalendarEvent({ title, description, date, contactNam
   }
   return res.json();
 }
+
+function calendarEventUrl(eventId) {
+  return `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`;
+}
+
+export async function updateCalendarEvent(eventId, { title, description, date, contactName }) {
+  const token = getStoredToken();
+  if (!token) throw new Error('No hay token de Google Calendar');
+
+  const event = {
+    summary: `Seguimiento: ${contactName} – ${title}`,
+    description,
+    start: { date },
+    end: { date },
+  };
+
+  const res = await fetch(calendarEventUrl(eventId), {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(event),
+  });
+
+  if (!res.ok) {
+    let message = 'Error actualizando evento';
+    try {
+      const err = await res.json();
+      message = err.error?.message || message;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(message);
+  }
+  return res.json();
+}
+
+export async function deleteCalendarEvent(eventId) {
+  const token = getStoredToken();
+  if (!token) throw new Error('No hay token de Google Calendar');
+
+  const res = await fetch(calendarEventUrl(eventId), {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok && res.status !== 410) {
+    let message = 'Error eliminando evento';
+    try {
+      const err = await res.json();
+      message = err.error?.message || message;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(message);
+  }
+}

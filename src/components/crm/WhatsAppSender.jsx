@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { MessageCircle, Copy, ExternalLink, Check, Sparkles } from "lucide-react";
 import { api } from "@/api/client";
 import { toast } from "sonner";
+import { syncConsultaProximoSeguimientoToGoogle } from "@/lib/syncConsultaGoogleCalendar";
 import { useWorkspace } from "@/components/context/WorkspaceContext";
 import { addBusinessDays } from "date-fns";
 
@@ -158,6 +159,22 @@ export default function WhatsAppSender({ open, onOpenChange, consulta, onMessage
     }
 
     await api.entities.Consulta.update(consulta.id, updates);
+
+    const nuevaFecha = updates.proximoSeguimiento;
+    const syncRes = await syncConsultaProximoSeguimientoToGoogle(
+      { ...consulta, ...updates },
+      nuevaFecha
+    );
+    if (!syncRes.ok && !syncRes.skipped) {
+      toast.error("No se pudo actualizar el evento en Google Calendar");
+      if (syncRes.notFound) {
+        try {
+          await api.entities.Consulta.update(consulta.id, { googleCalendarEventId: null });
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
 
     toast.success("Mensaje registrado correctamente");
     setLoading(false);
