@@ -12,13 +12,7 @@ const OPCIONES = [
     page: "Configuracion",
     color: "bg-slate-100 text-slate-700"
   },
-  {
-    title: "Miembros del Workspace",
-    description: "Invitá a tu equipo y gestioná roles de acceso",
-    icon: Users,
-    page: "MiembrosWorkspace",
-    color: "bg-violet-100 text-violet-700"
-  },
+  
   {
     title: "Plantillas WhatsApp",
     description: "Gestiona tus mensajes predefinidos y variables",

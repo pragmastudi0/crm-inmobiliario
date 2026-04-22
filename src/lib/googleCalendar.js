@@ -1,15 +1,12 @@
+import { GOOGLE_CALENDAR_OAUTH_CLIENT_ID } from '@/lib/googleCalendarClientId';
+
 const SCOPES = 'https://www.googleapis.com/auth/calendar.events';
 const TOKEN_KEY = 'gcal_token';
 const TOKEN_EXPIRY_KEY = 'gcal_token_expiry';
-const CLIENT_ID_KEY = 'gcal_client_id';
 const EMAIL_KEY = 'gcal_user_email';
 
 export function getClientId() {
-  return localStorage.getItem(CLIENT_ID_KEY) || '';
-}
-
-export function saveClientId(clientId) {
-  localStorage.setItem(CLIENT_ID_KEY, clientId);
+  return GOOGLE_CALENDAR_OAUTH_CLIENT_ID;
 }
 
 export function getConnectedEmail() {
@@ -72,7 +69,7 @@ export async function connectGoogleCalendar(clientId) {
 export async function connect() {
   const id = getClientId();
   if (!id) {
-    throw new Error('Configurá el Google Client ID antes de conectar');
+    throw new Error('Falta la configuración de Google OAuth en la aplicación');
   }
   return connectGoogleCalendar(id);
 }
@@ -130,4 +127,62 @@ export async function createCalendarEvent({ title, description, date, contactNam
     throw new Error(err.error?.message || 'Error creando evento');
   }
   return res.json();
+}
+
+function calendarEventUrl(eventId) {
+  return `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`;
+}
+
+export async function updateCalendarEvent(eventId, { title, description, date, contactName }) {
+  const token = getStoredToken();
+  if (!token) throw new Error('No hay token de Google Calendar');
+
+  const event = {
+    summary: `Seguimiento: ${contactName} – ${title}`,
+    description,
+    start: { date },
+    end: { date },
+  };
+
+  const res = await fetch(calendarEventUrl(eventId), {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(event),
+  });
+
+  if (!res.ok) {
+    let message = 'Error actualizando evento';
+    try {
+      const err = await res.json();
+      message = err.error?.message || message;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(message);
+  }
+  return res.json();
+}
+
+export async function deleteCalendarEvent(eventId) {
+  const token = getStoredToken();
+  if (!token) throw new Error('No hay token de Google Calendar');
+
+  const res = await fetch(calendarEventUrl(eventId), {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok && res.status !== 410) {
+    let message = 'Error eliminando evento';
+    try {
+      const err = await res.json();
+      message = err.error?.message || message;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(message);
+  }
 }

@@ -14,6 +14,7 @@ import moment from "moment";
 import { getNextBusinessDay } from "@/components/utils/dateUtils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { isGoogleCalendarConnected as isGCalConnected, createCalendarEvent } from "@/lib/googleCalendar";
+import { buildConsultaCalendarPayload, syncConsultaProximoSeguimientoToGoogle } from "@/lib/syncConsultaGoogleCalendar";
 
 const CANALES_DEFAULT = [
   "Zona Prop", "Argenprop", "MercadoLibre", "La Voz del Interior",
@@ -170,23 +171,44 @@ export default function ConsultaForm({ open, onOpenChange, consulta, onSave }) {
       if (consulta) {
         await api.entities.Consulta.update(consulta.id, dataToSave);
         toast.success("Consulta actualizada");
+
+        const prevSeg = consulta.proximoSeguimiento;
+        const nextSeg = formData.proximoSeguimiento;
+        if (
+          consulta.googleCalendarEventId &&
+          isGCalConnected() &&
+          nextSeg &&
+          nextSeg !== prevSeg
+        ) {
+          const merged = { ...consulta, ...dataToSave };
+          const syncRes = await syncConsultaProximoSeguimientoToGoogle(merged, nextSeg);
+          if (!syncRes.ok && !syncRes.skipped) {
+            console.error("Google Calendar sync failed:", syncRes.error);
+            toast.error("No se pudo actualizar el evento en Google Calendar");
+            if (syncRes.notFound) {
+              try {
+                await api.entities.Consulta.update(consulta.id, { googleCalendarEventId: null });
+              } catch (e) {
+                console.error(e);
+              }
+            }
+          }
+        }
       } else {
-        await api.entities.Consulta.create(dataToSave);
+        const created = await api.entities.Consulta.create(dataToSave);
         toast.success("Consulta / lead creada");
 
         if (syncGCal && isGCalConnected() && formData.proximoSeguimiento) {
           try {
-            await createCalendarEvent({
-              title: formData.propiedadConsultada,
-              description: [
-                formData.tipoPropiedad && `Tipo: ${formData.tipoPropiedad}`,
-                formData.operacionBuscada && `Operación: ${formData.operacionBuscada}`,
-                formData.barrio && `Barrio: ${formData.barrio}`,
-                formData.prioridad && `Prioridad: ${formData.prioridad}`,
-              ].filter(Boolean).join("\n"),
+            const calPayload = buildConsultaCalendarPayload(
+              { ...dataToSave, contactoNombre: contacto?.nombre },
+              contacto?.nombre
+            );
+            const event = await createCalendarEvent({
+              ...calPayload,
               date: formData.proximoSeguimiento,
-              contactName: contacto?.nombre,
             });
+            await api.entities.Consulta.update(created.id, { googleCalendarEventId: event.id });
             toast.success("Evento creado en Google Calendar");
           } catch (err) {
             console.error("Google Calendar sync failed:", err);
