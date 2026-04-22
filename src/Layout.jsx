@@ -135,11 +135,7 @@ export default function Layout({ children, currentPageName }) {
       </main>
       <Button
         variant="secondary"
-        className={cn(
-          "fixed bottom-4 z-40 gap-2",
-          "left-4 lg:left-20",
-          !sidebarCollapsed && "lg:left-[17rem]"
-        )}
+        className="fixed left-4 bottom-4 z-40 gap-2"
         onClick={() => logout(true)}
       >
         <LogOut className="w-4 h-4" />

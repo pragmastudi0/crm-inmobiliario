@@ -13,7 +13,6 @@ import moment from "moment";
 import WhatsAppSender from "@/components/crm/WhatsAppSender";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import { syncConsultaProximoSeguimientoToGoogle } from "@/lib/syncConsultaGoogleCalendar";
 
 const etapaColors = {
   Nuevo: "bg-blue-100 text-blue-700",
@@ -109,20 +108,6 @@ export default function Hoy() {
       id: consulta.id,
       data: { proximoSeguimiento: fecha }
     });
-    const syncRes = await syncConsultaProximoSeguimientoToGoogle(
-      { ...consulta, proximoSeguimiento: fecha },
-      fecha
-    );
-    if (!syncRes.ok && !syncRes.skipped) {
-      toast.error("No se pudo actualizar el evento en Google Calendar");
-      if (syncRes.notFound) {
-        try {
-          await api.entities.Consulta.update(consulta.id, { googleCalendarEventId: null });
-        } catch (e) {
-          console.error(e);
-        }
-      }
-    }
     toast.success(`Seguimiento agendado para ${moment(fecha).format("DD/MM")}`);
   };
 

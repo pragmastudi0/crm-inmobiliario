@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, CalendarSync, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ArrowLeft, CalendarSync, CheckCircle2, XCircle, Loader2, Info } from "lucide-react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { toast } from "sonner";
@@ -11,21 +13,33 @@ import {
   connect,
   disconnect,
   getClientId,
+  saveClientId,
 } from "@/lib/googleCalendar";
 
 export default function GoogleCalendarConfig() {
   const [connected, setConnected] = useState(false);
   const [email, setEmail] = useState("");
+  const [clientId, setClientId] = useState("");
   const [connecting, setConnecting] = useState(false);
 
   useEffect(() => {
     setConnected(isConnected());
     setEmail(getConnectedEmail());
+    setClientId(getClientId());
   }, []);
+
+  const handleSaveClientId = () => {
+    if (!clientId.trim()) {
+      toast.error("Ingresá un Client ID válido");
+      return;
+    }
+    saveClientId(clientId.trim());
+    toast.success("Client ID guardado");
+  };
 
   const handleConnect = async () => {
     if (!getClientId()) {
-      toast.error("La aplicación no tiene configurado el Client ID de Google");
+      toast.error("Primero configurá tu Google Client ID");
       return;
     }
     setConnecting(true);
@@ -115,6 +129,45 @@ export default function GoogleCalendarConfig() {
           </CardContent>
         </Card>
 
+        {/* Configuración de Client ID */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Info className="w-5 h-5" />
+              Google Client ID
+            </CardTitle>
+            <CardDescription>
+              Para conectar con Google Calendar necesitás un Client ID de Google Cloud Console
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="clientId">Client ID de Google OAuth 2.0</Label>
+              <Input
+                id="clientId"
+                value={clientId}
+                onChange={(e) => setClientId(e.target.value)}
+                placeholder="123456789.apps.googleusercontent.com"
+              />
+              <p className="text-xs text-slate-400">
+                Obtené tu Client ID desde{" "}
+                <a
+                  href="https://console.cloud.google.com/apis/credentials"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline text-blue-500 hover:text-blue-700"
+                >
+                  Google Cloud Console
+                </a>
+                . Asegurate de habilitar la API de Google Calendar.
+              </p>
+            </div>
+            <Button onClick={handleSaveClientId} variant="outline">
+              Guardar Client ID
+            </Button>
+          </CardContent>
+        </Card>
+
         {/* Instrucciones */}
         <Card>
           <CardHeader>
@@ -122,6 +175,7 @@ export default function GoogleCalendarConfig() {
           </CardHeader>
           <CardContent>
             <ol className="list-decimal list-inside space-y-2 text-sm text-slate-600">
+              <li>Configurá tu Google Client ID arriba</li>
               <li>Hacé clic en &quot;Conectar con Google&quot; y autorizá el acceso</li>
               <li>
                 Al crear una nueva consulta / lead, marcá la opción
