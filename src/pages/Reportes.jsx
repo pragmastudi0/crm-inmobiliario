@@ -33,8 +33,9 @@ export default function Reportes() {
   });
 
   const { data: users = [] } = useQuery({
-    queryKey: ['users-reportes'],
-    queryFn: () => api.entities.User.list(),
+    queryKey: ['users-reportes', workspace?.id],
+    queryFn: () => (workspace ? api.entities.User.list({ workspace_id: workspace.id }) : []),
+    enabled: !!workspace,
   });
 
   const dias = parseInt(periodo);

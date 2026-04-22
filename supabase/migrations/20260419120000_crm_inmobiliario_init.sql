@@ -53,6 +53,7 @@ $$ LANGUAGE plpgsql;
 -- ---------------------------------------------------------------------------
 CREATE TABLE public.crm_inmobiliario_profiles (
   id uuid PRIMARY KEY REFERENCES auth.users (id) ON DELETE CASCADE,
+  app_slug text NOT NULL DEFAULT 'crm-inmobiliario',
   email text,
   full_name text,
   avatar_url text,
@@ -69,6 +70,7 @@ CREATE TRIGGER crm_inmobiliario_profiles_updated_at
 
 CREATE TABLE public.crm_inmobiliario_workspaces (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  app_slug text NOT NULL DEFAULT 'crm-inmobiliario',
   name text NOT NULL DEFAULT 'Mi Workspace',
   owner_user_id uuid REFERENCES auth.users (id) ON DELETE SET NULL,
   industry text NOT NULL DEFAULT 'real_estate',
@@ -83,6 +85,7 @@ CREATE TRIGGER crm_inmobiliario_workspaces_updated_at
 
 CREATE TABLE public.crm_inmobiliario_workspace_members (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  app_slug text NOT NULL DEFAULT 'crm-inmobiliario',
   workspace_id uuid NOT NULL REFERENCES public.crm_inmobiliario_workspaces (id) ON DELETE CASCADE,
   user_id uuid NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
   role text NOT NULL DEFAULT 'member' CHECK (role IN ('admin', 'member')),
@@ -95,6 +98,7 @@ CREATE INDEX idx_crm_inmobiliario_wm_ws ON public.crm_inmobiliario_workspace_mem
 
 CREATE TABLE public.crm_inmobiliario_workspace_pending_invites (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  app_slug text NOT NULL DEFAULT 'crm-inmobiliario',
   workspace_id uuid NOT NULL REFERENCES public.crm_inmobiliario_workspaces (id) ON DELETE CASCADE,
   email text NOT NULL,
   role text NOT NULL DEFAULT 'member' CHECK (role IN ('admin', 'member')),
@@ -305,29 +309,55 @@ CREATE INDEX idx_crm_inmobiliario_mensajes_ws ON public.crm_inmobiliario_mensaje
 -- ---------------------------------------------------------------------------
 -- Auth trigger
 -- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.crm_inmobiliario_app_slug()
+RETURNS text
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT 'crm-inmobiliario'::text;
+$$;
+
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
+DECLARE
+  app_slug_const text := public.crm_inmobiliario_app_slug();
+  can_attach_to_crm boolean := false;
 BEGIN
-  INSERT INTO public.crm_inmobiliario_profiles (id, email, full_name)
-  VALUES (
-    NEW.id,
-    NEW.email,
-    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1))
-  )
-  ON CONFLICT (id) DO UPDATE SET
-    email = EXCLUDED.email,
-    full_name = COALESCE(EXCLUDED.full_name, public.crm_inmobiliario_profiles.full_name);
+  can_attach_to_crm := COALESCE(lower(NEW.raw_user_meta_data->>'app_slug') = lower(app_slug_const), false)
+    OR EXISTS (
+      SELECT 1
+      FROM public.crm_inmobiliario_workspace_pending_invites pi
+      WHERE lower(pi.email) = lower(NEW.email)
+        AND pi.app_slug = app_slug_const
+    );
 
-  INSERT INTO public.crm_inmobiliario_workspace_members (workspace_id, user_id, role)
-  SELECT pi.workspace_id, NEW.id, pi.role
+  IF can_attach_to_crm THEN
+    INSERT INTO public.crm_inmobiliario_profiles (id, app_slug, email, full_name)
+    VALUES (
+      NEW.id,
+      app_slug_const,
+      NEW.email,
+      COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1))
+    )
+    ON CONFLICT (id) DO UPDATE SET
+      app_slug = EXCLUDED.app_slug,
+      email = EXCLUDED.email,
+      full_name = COALESCE(EXCLUDED.full_name, public.crm_inmobiliario_profiles.full_name);
+  END IF;
+
+  INSERT INTO public.crm_inmobiliario_workspace_members (app_slug, workspace_id, user_id, role)
+  SELECT app_slug_const, pi.workspace_id, NEW.id, pi.role
   FROM public.crm_inmobiliario_workspace_pending_invites pi
-  WHERE lower(pi.email) = lower(NEW.email);
+  WHERE lower(pi.email) = lower(NEW.email)
+    AND pi.app_slug = app_slug_const;
 
-  DELETE FROM public.crm_inmobiliario_workspace_pending_invites WHERE lower(email) = lower(NEW.email);
+  DELETE FROM public.crm_inmobiliario_workspace_pending_invites
+  WHERE lower(email) = lower(NEW.email)
+    AND app_slug = app_slug_const;
 
   RETURN NEW;
 END;
@@ -349,7 +379,12 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
   SELECT COALESCE(
-    (SELECT p.is_platform_admin FROM public.crm_inmobiliario_profiles p WHERE p.id = auth.uid()),
+    (
+      SELECT p.is_platform_admin
+      FROM public.crm_inmobiliario_profiles p
+      WHERE p.id = auth.uid()
+        AND p.app_slug = public.crm_inmobiliario_app_slug()
+    ),
     false
   );
 $$;
@@ -361,7 +396,12 @@ STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT workspace_id FROM public.crm_inmobiliario_workspace_members WHERE user_id = auth.uid();
+  SELECT wm.workspace_id
+  FROM public.crm_inmobiliario_workspace_members wm
+  JOIN public.crm_inmobiliario_workspaces w ON w.id = wm.workspace_id
+  WHERE wm.user_id = auth.uid()
+    AND wm.app_slug = public.crm_inmobiliario_app_slug()
+    AND w.app_slug = public.crm_inmobiliario_app_slug();
 $$;
 
 ALTER TABLE public.crm_inmobiliario_profiles ENABLE ROW LEVEL SECURITY;
@@ -397,39 +437,101 @@ CREATE POLICY crm_inm_workspaces_update ON public.crm_inmobiliario_workspaces FO
   USING (id IN (SELECT public.user_workspace_ids()) OR public.current_is_platform_admin())
   WITH CHECK (id IN (SELECT public.user_workspace_ids()) OR public.current_is_platform_admin());
 
-CREATE POLICY crm_inm_wm_rw ON public.crm_inmobiliario_workspace_members FOR ALL TO authenticated
+CREATE POLICY crm_inm_wm_select ON public.crm_inmobiliario_workspace_members FOR SELECT TO authenticated
   USING (
-    workspace_id IN (SELECT public.user_workspace_ids())
+    (
+      app_slug = public.crm_inmobiliario_app_slug()
+      AND workspace_id IN (SELECT public.user_workspace_ids())
+    )
     OR public.current_is_platform_admin()
+  );
+
+CREATE POLICY crm_inm_wm_insert ON public.crm_inmobiliario_workspace_members FOR INSERT TO authenticated
+  WITH CHECK (
+    app_slug = public.crm_inmobiliario_app_slug()
+    AND (
+      workspace_id IN (
+        SELECT wm.workspace_id FROM public.crm_inmobiliario_workspace_members wm
+        WHERE wm.user_id = auth.uid()
+          AND wm.role = 'admin'
+          AND wm.app_slug = public.crm_inmobiliario_app_slug()
+      )
+      OR public.current_is_platform_admin()
+    )
+  );
+
+CREATE POLICY crm_inm_wm_update ON public.crm_inmobiliario_workspace_members FOR UPDATE TO authenticated
+  USING (
+    app_slug = public.crm_inmobiliario_app_slug()
+    AND (
+      workspace_id IN (
+        SELECT wm.workspace_id FROM public.crm_inmobiliario_workspace_members wm
+        WHERE wm.user_id = auth.uid()
+          AND wm.role = 'admin'
+          AND wm.app_slug = public.crm_inmobiliario_app_slug()
+      )
+      OR public.current_is_platform_admin()
+    )
   )
   WITH CHECK (
-    workspace_id IN (SELECT public.user_workspace_ids())
-    OR public.current_is_platform_admin()
+    app_slug = public.crm_inmobiliario_app_slug()
+    AND (
+      workspace_id IN (
+        SELECT wm.workspace_id FROM public.crm_inmobiliario_workspace_members wm
+        WHERE wm.user_id = auth.uid()
+          AND wm.role = 'admin'
+          AND wm.app_slug = public.crm_inmobiliario_app_slug()
+      )
+      OR public.current_is_platform_admin()
+    )
+  );
+
+CREATE POLICY crm_inm_wm_delete ON public.crm_inmobiliario_workspace_members FOR DELETE TO authenticated
+  USING (
+    app_slug = public.crm_inmobiliario_app_slug()
+    AND (
+      workspace_id IN (
+        SELECT wm.workspace_id FROM public.crm_inmobiliario_workspace_members wm
+        WHERE wm.user_id = auth.uid()
+          AND wm.role = 'admin'
+          AND wm.app_slug = public.crm_inmobiliario_app_slug()
+      )
+      OR public.current_is_platform_admin()
+    )
   );
 
 CREATE POLICY crm_inm_wpi_select ON public.crm_inmobiliario_workspace_pending_invites FOR SELECT TO authenticated
   USING (
-    workspace_id IN (
-      SELECT wm.workspace_id FROM public.crm_inmobiliario_workspace_members wm
-      WHERE wm.user_id = auth.uid() AND wm.role = 'admin'
+    (
+      app_slug = public.crm_inmobiliario_app_slug()
+      AND workspace_id IN (
+        SELECT wm.workspace_id FROM public.crm_inmobiliario_workspace_members wm
+        WHERE wm.user_id = auth.uid() AND wm.role = 'admin' AND wm.app_slug = public.crm_inmobiliario_app_slug()
+      )
     )
     OR public.current_is_platform_admin()
   );
 
 CREATE POLICY crm_inm_wpi_insert ON public.crm_inmobiliario_workspace_pending_invites FOR INSERT TO authenticated
   WITH CHECK (
-    workspace_id IN (
-      SELECT wm.workspace_id FROM public.crm_inmobiliario_workspace_members wm
-      WHERE wm.user_id = auth.uid() AND wm.role = 'admin'
+    (
+      app_slug = public.crm_inmobiliario_app_slug()
+      AND workspace_id IN (
+        SELECT wm.workspace_id FROM public.crm_inmobiliario_workspace_members wm
+        WHERE wm.user_id = auth.uid() AND wm.role = 'admin' AND wm.app_slug = public.crm_inmobiliario_app_slug()
+      )
     )
     OR public.current_is_platform_admin()
   );
 
 CREATE POLICY crm_inm_wpi_delete ON public.crm_inmobiliario_workspace_pending_invites FOR DELETE TO authenticated
   USING (
-    workspace_id IN (
-      SELECT wm.workspace_id FROM public.crm_inmobiliario_workspace_members wm
-      WHERE wm.user_id = auth.uid() AND wm.role = 'admin'
+    (
+      app_slug = public.crm_inmobiliario_app_slug()
+      AND workspace_id IN (
+        SELECT wm.workspace_id FROM public.crm_inmobiliario_workspace_members wm
+        WHERE wm.user_id = auth.uid() AND wm.role = 'admin' AND wm.app_slug = public.crm_inmobiliario_app_slug()
+      )
     )
     OR public.current_is_platform_admin()
   );
@@ -625,7 +727,10 @@ BEGIN
 
   SELECT wm.workspace_id INTO wid
   FROM public.crm_inmobiliario_workspace_members wm
+  JOIN public.crm_inmobiliario_workspaces w ON w.id = wm.workspace_id
   WHERE wm.user_id = uid
+    AND wm.app_slug = public.crm_inmobiliario_app_slug()
+    AND w.app_slug = public.crm_inmobiliario_app_slug()
   ORDER BY CASE WHEN wm.role = 'admin' THEN 0 ELSE 1 END, wm.created_at
   LIMIT 1;
 
@@ -654,7 +759,11 @@ BEGIN
   IF NOT public.current_is_platform_admin() THEN
     RAISE EXCEPTION 'forbidden';
   END IF;
-  RETURN QUERY SELECT * FROM public.crm_inmobiliario_workspaces ORDER BY created_at DESC;
+  RETURN QUERY
+  SELECT *
+  FROM public.crm_inmobiliario_workspaces
+  WHERE app_slug = public.crm_inmobiliario_app_slug()
+  ORDER BY created_at DESC;
 END;
 $$;
 
@@ -671,8 +780,12 @@ BEGIN
   RETURN QUERY
   SELECT p.*
   FROM public.crm_inmobiliario_profiles p
-  WHERE NOT EXISTS (
-    SELECT 1 FROM public.crm_inmobiliario_workspace_members m WHERE m.user_id = p.id
+  WHERE p.app_slug = public.crm_inmobiliario_app_slug()
+    AND NOT EXISTS (
+    SELECT 1
+    FROM public.crm_inmobiliario_workspace_members m
+    WHERE m.user_id = p.id
+      AND m.app_slug = public.crm_inmobiliario_app_slug()
   )
   ORDER BY p.created_at DESC;
 END;
@@ -697,12 +810,21 @@ BEGIN
     RAISE EXCEPTION 'owner required';
   END IF;
 
-  INSERT INTO public.crm_inmobiliario_workspaces (name, owner_user_id, industry, onboarding_completed)
-  VALUES (trim(p_name), p_owner_user_id, 'real_estate', false)
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.crm_inmobiliario_profiles p
+    WHERE p.id = p_owner_user_id
+      AND p.app_slug = public.crm_inmobiliario_app_slug()
+  ) THEN
+    RAISE EXCEPTION 'owner does not belong to crm-inmobiliario';
+  END IF;
+
+  INSERT INTO public.crm_inmobiliario_workspaces (app_slug, name, owner_user_id, industry, onboarding_completed)
+  VALUES (public.crm_inmobiliario_app_slug(), trim(p_name), p_owner_user_id, 'real_estate', false)
   RETURNING id INTO wid;
 
-  INSERT INTO public.crm_inmobiliario_workspace_members (workspace_id, user_id, role)
-  VALUES (wid, p_owner_user_id, 'admin');
+  INSERT INTO public.crm_inmobiliario_workspace_members (app_slug, workspace_id, user_id, role)
+  VALUES (public.crm_inmobiliario_app_slug(), wid, p_owner_user_id, 'admin');
 
   PERFORM public.seed_workspace_template(wid);
   RETURN wid;
@@ -724,11 +846,27 @@ BEGIN
   IF p_workspace_id IS NULL OR p_user_id IS NULL THEN
     RAISE EXCEPTION 'invalid arguments';
   END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.crm_inmobiliario_workspaces w
+    WHERE w.id = p_workspace_id
+      AND w.app_slug = public.crm_inmobiliario_app_slug()
+  ) THEN
+    RAISE EXCEPTION 'workspace does not belong to crm-inmobiliario';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.crm_inmobiliario_profiles p
+    WHERE p.id = p_user_id
+      AND p.app_slug = public.crm_inmobiliario_app_slug()
+  ) THEN
+    RAISE EXCEPTION 'user does not belong to crm-inmobiliario';
+  END IF;
   r := CASE WHEN lower(trim(p_role)) = 'admin' THEN 'admin' ELSE 'member' END;
 
-  INSERT INTO public.crm_inmobiliario_workspace_members (workspace_id, user_id, role)
-  VALUES (p_workspace_id, p_user_id, r)
-  ON CONFLICT (workspace_id, user_id) DO UPDATE SET role = EXCLUDED.role;
+  INSERT INTO public.crm_inmobiliario_workspace_members (app_slug, workspace_id, user_id, role)
+  VALUES (public.crm_inmobiliario_app_slug(), p_workspace_id, p_user_id, r)
+  ON CONFLICT (workspace_id, user_id) DO UPDATE SET
+    role = EXCLUDED.role,
+    app_slug = EXCLUDED.app_slug;
 END;
 $$;
 

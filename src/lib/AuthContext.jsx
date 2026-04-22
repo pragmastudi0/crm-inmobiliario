@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { supabase } from '@/api/supabaseClient';
-import { TBL } from '@/api/entityApi';
+import { CRM_APP_SLUG, TBL } from '@/api/entityApi';
 
 const AuthContext = createContext();
 
@@ -23,8 +23,19 @@ export const AuthProvider = ({ children }) => {
         }
         return;
       }
-      const { data: profile } = await supabase.from(TBL.profiles).select('*').eq('id', session.user.id).maybeSingle();
+      const { data: profile } = await supabase
+        .from(TBL.profiles)
+        .select('*')
+        .eq('id', session.user.id)
+        .eq('app_slug', CRM_APP_SLUG)
+        .maybeSingle();
       if (!mounted) return;
+      if (!profile) {
+        setUser(null);
+        setIsAuthenticated(false);
+        setAuthError('Tu usuario no está habilitado para CRM Inmobiliario');
+        return;
+      }
       setUser({
         id: session.user.id,
         email: session.user.email,
@@ -77,7 +88,19 @@ export const AuthProvider = ({ children }) => {
       data: { session },
     } = await supabase.auth.getSession();
     if (session?.user) {
-      const { data: profile } = await supabase.from(TBL.profiles).select('*').eq('id', session.user.id).maybeSingle();
+      const { data: profile } = await supabase
+        .from(TBL.profiles)
+        .select('*')
+        .eq('id', session.user.id)
+        .eq('app_slug', CRM_APP_SLUG)
+        .maybeSingle();
+      if (!profile) {
+        setUser(null);
+        setIsAuthenticated(false);
+        setAuthError('Tu usuario no está habilitado para CRM Inmobiliario');
+        setIsLoadingAuth(false);
+        return;
+      }
       setUser({
         id: session.user.id,
         email: session.user.email,

@@ -1,5 +1,5 @@
 import { supabase } from '@/api/supabaseClient';
-import { entities, TBL } from '@/api/entityApi';
+import { CRM_APP_SLUG, entities, TBL } from '@/api/entityApi';
 
 export async function inviteWorkspaceMember({ email, role, workspaceId }) {
   const { data, error } = await supabase.functions.invoke('invite-workspace-member', {
@@ -27,7 +27,17 @@ export const api = {
         err.status = 401;
         throw err;
       }
-      const { data: profile } = await supabase.from(TBL.profiles).select('*').eq('id', user.id).maybeSingle();
+      const { data: profile } = await supabase
+        .from(TBL.profiles)
+        .select('*')
+        .eq('id', user.id)
+        .eq('app_slug', CRM_APP_SLUG)
+        .maybeSingle();
+      if (!profile) {
+        const err = new Error('User is not enabled for crm-inmobiliario');
+        err.status = 403;
+        throw err;
+      }
       return {
         id: user.id,
         email: user.email,
@@ -49,7 +59,11 @@ export const api = {
       if (patch.postventa_follow_up_days !== undefined) {
         allowed.postventa_follow_up_days = Number(patch.postventa_follow_up_days);
       }
-      const { error } = await supabase.from(TBL.profiles).update(allowed).eq('id', user.id);
+      const { error } = await supabase
+        .from(TBL.profiles)
+        .update(allowed)
+        .eq('id', user.id)
+        .eq('app_slug', CRM_APP_SLUG);
       if (error) throw error;
     },
     async logout(redirect) {

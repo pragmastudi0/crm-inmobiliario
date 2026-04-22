@@ -1,8 +1,9 @@
 import { api } from "@/api/client";
 
 // Obtiene todas las ventas existentes y devuelve un mapa de año -> max secuencia
-export async function getMaxSecuenciasPorAnio() {
-  const todasLasVentas = await api.entities.Venta.list("-codigo", 10000, {});
+export async function getMaxSecuenciasPorAnio(workspaceId) {
+  if (!workspaceId) throw new Error("workspace_id requerido para generar códigos de venta");
+  const todasLasVentas = await api.entities.Venta.list("-codigo", 10000, { workspace_id: workspaceId });
   
   const maxPorAnio = {};
   

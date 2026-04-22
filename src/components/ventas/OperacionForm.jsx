@@ -141,7 +141,7 @@ export default function OperacionForm({ open, onOpenChange, consulta, onOperacio
         await api.entities.Venta.update(operacionExistente.id, dataToSave);
         toast.success("Operación actualizada");
       } else {
-        const ops = await api.entities.Venta.list("-created_date", 1);
+        const ops = await api.entities.Venta.list("-created_date", 1, { workspace_id: workspace?.id });
         let nuevoCodigo = `OP-${new Date().getFullYear()}-000001`;
         if (ops.length > 0 && ops[0].codigo) {
           const partes = ops[0].codigo.split('-');

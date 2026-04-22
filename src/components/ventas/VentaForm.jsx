@@ -183,7 +183,7 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada,
         toast.success(finalizar ? "Venta finalizada" : "Venta actualizada");
       } else {
         // Crear nueva venta
-        const ventas = await api.entities.Venta.list("-created_date", 1);
+        const ventas = await api.entities.Venta.list("-created_date", 1, { workspace_id: workspace?.id });
         let nuevoCodigo = `V-${new Date().getFullYear()}-000001`;
         
         if (ventas.length > 0 && ventas[0].codigo) {

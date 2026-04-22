@@ -11,8 +11,10 @@ import { api } from "@/api/client";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { useQuery } from "@tanstack/react-query";
+import { useWorkspace } from "@/components/context/WorkspaceContext";
 
 export default function ExportarVentas() {
+  const { workspace } = useWorkspace();
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
   const [marketplace, setMarketplace] = useState("all");
@@ -22,17 +24,19 @@ export default function ExportarVentas() {
   const [loading, setLoading] = useState(false);
 
   const { data: proveedores = [] } = useQuery({
-    queryKey: ['proveedores'],
-    queryFn: () => api.entities.Proveedor.filter({ activo: true }),
+    queryKey: ['proveedores', workspace?.id],
+    queryFn: () => (workspace ? api.entities.Proveedor.filter({ workspace_id: workspace.id, activo: true }) : []),
+    enabled: !!workspace,
   });
 
   const { data: usuarios = [] } = useQuery({
-    queryKey: ['usuarios'],
-    queryFn: () => api.entities.User.list(),
+    queryKey: ['usuarios', workspace?.id],
+    queryFn: () => (workspace ? api.entities.User.list({ workspace_id: workspace.id }) : []),
+    enabled: !!workspace,
   });
 
   const buildQuery = () => {
-    const query = {};
+    const query = { workspace_id: workspace?.id };
 
     if (fechaDesde) {
       query.fecha = { $gte: fechaDesde };
