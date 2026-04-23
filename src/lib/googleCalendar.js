@@ -1,6 +1,17 @@
 import { GOOGLE_CALENDAR_OAUTH_CLIENT_ID } from '@/lib/googleCalendarClientId';
+import { normalizeSeguimientoCalendarDay } from '@/components/utils/dateUtils';
 
 const SCOPES = 'https://www.googleapis.com/auth/calendar.events';
+
+/** Fin exclusivo para eventos all-day (Calendar API v3). */
+function exclusiveEndDateForAllDay(startYyyyMmDd) {
+  const start = normalizeSeguimientoCalendarDay(startYyyyMmDd);
+  if (!start) return start;
+  const [y, m, d] = start.split('-').map(Number);
+  const u = new Date(Date.UTC(y, m - 1, d));
+  u.setUTCDate(u.getUTCDate() + 1);
+  return u.toISOString().slice(0, 10);
+}
 const TOKEN_KEY = 'gcal_token';
 const TOKEN_EXPIRY_KEY = 'gcal_token_expiry';
 const EMAIL_KEY = 'gcal_user_email';
@@ -126,11 +137,14 @@ export async function createCalendarEvent({ title, description, date, contactNam
   const token = getStoredToken();
   if (!token) throw new Error('No hay token de Google Calendar');
 
+  const startDate = normalizeSeguimientoCalendarDay(date);
+  if (!startDate) throw new Error('Fecha de seguimiento no válida');
+
   const event = {
     summary: `Seguimiento: ${contactName} – ${title}`,
     description,
-    start: { date },
-    end: { date },
+    start: { date: startDate },
+    end: { date: exclusiveEndDateForAllDay(startDate) },
   };
 
   const res = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
@@ -157,11 +171,14 @@ export async function updateCalendarEvent(eventId, { title, description, date, c
   const token = getStoredToken();
   if (!token) throw new Error('No hay token de Google Calendar');
 
+  const startDate = normalizeSeguimientoCalendarDay(date);
+  if (!startDate) throw new Error('Fecha de seguimiento no válida');
+
   const event = {
     summary: `Seguimiento: ${contactName} – ${title}`,
     description,
-    start: { date },
-    end: { date },
+    start: { date: startDate },
+    end: { date: exclusiveEndDateForAllDay(startDate) },
   };
 
   const res = await fetch(calendarEventUrl(eventId), {

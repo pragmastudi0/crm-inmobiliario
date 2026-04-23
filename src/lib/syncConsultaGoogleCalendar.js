@@ -1,4 +1,5 @@
 import { getStoredToken, updateCalendarEvent } from '@/lib/googleCalendar';
+import { normalizeSeguimientoCalendarDay } from '@/components/utils/dateUtils';
 
 /** Campos alineados con createCalendarEvent en ConsultaForm */
 export function buildConsultaCalendarPayload(consulta, contactName) {
@@ -20,7 +21,8 @@ export function buildConsultaCalendarPayload(consulta, contactName) {
  */
 export async function syncConsultaProximoSeguimientoToGoogle(consulta, proximoSeguimiento) {
   const eventId = consulta.googleCalendarEventId;
-  if (!eventId || !getStoredToken() || !proximoSeguimiento) {
+  const day = normalizeSeguimientoCalendarDay(proximoSeguimiento);
+  if (!eventId || !getStoredToken() || !day) {
     return { ok: true, skipped: true };
   }
   const { title, description, contactName } = buildConsultaCalendarPayload(consulta);
@@ -28,7 +30,7 @@ export async function syncConsultaProximoSeguimientoToGoogle(consulta, proximoSe
     await updateCalendarEvent(eventId, {
       title,
       description,
-      date: proximoSeguimiento,
+      date: day,
       contactName,
     });
     return { ok: true };

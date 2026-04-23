@@ -11,7 +11,7 @@ import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { User, Search, Calendar, Plus, CalendarSync } from "lucide-react";
 import moment from "moment";
-import { getNextBusinessDay } from "@/components/utils/dateUtils";
+import { getNextBusinessDay, normalizeSeguimientoCalendarDay } from "@/components/utils/dateUtils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { isGoogleCalendarConnected as isGCalConnected, createCalendarEvent } from "@/lib/googleCalendar";
 import { buildConsultaCalendarPayload, syncConsultaProximoSeguimientoToGoogle } from "@/lib/syncConsultaGoogleCalendar";
@@ -98,7 +98,7 @@ export default function ConsultaForm({ open, onOpenChange, consulta, onSave }) {
           : (consulta.caracteristicas ? consulta.caracteristicas.split(',').map(s => s.trim()).filter(Boolean) : []),
         presupuestoMax: consulta.presupuestoMax || "",
         precioCotizado: consulta.precioCotizado || "",
-        proximoSeguimiento: consulta.proximoSeguimiento || "",
+        proximoSeguimiento: normalizeSeguimientoCalendarDay(consulta.proximoSeguimiento) || "",
         concretado: !!consulta.concretado,
       });
     } else {
@@ -156,8 +156,11 @@ export default function ConsultaForm({ open, onOpenChange, consulta, onSave }) {
     setSubmitting(true);
     try {
       const contacto = contactos.find(c => c.id === formData.contactoId);
+      const proximoSeguimientoGuardar =
+        normalizeSeguimientoCalendarDay(formData.proximoSeguimiento) || formData.proximoSeguimiento || "";
       const dataToSave = {
         ...formData,
+        proximoSeguimiento: proximoSeguimientoGuardar,
         contactoNombre: contacto?.nombre,
         contactoWhatsapp: contacto?.whatsapp,
         presupuestoMax: formData.presupuestoMax ? Number(formData.presupuestoMax) : null,
@@ -172,16 +175,16 @@ export default function ConsultaForm({ open, onOpenChange, consulta, onSave }) {
         await api.entities.Consulta.update(consulta.id, dataToSave);
         toast.success("Consulta actualizada");
 
-        const prevSeg = consulta.proximoSeguimiento;
-        const nextSeg = formData.proximoSeguimiento;
+        const prevDay = normalizeSeguimientoCalendarDay(consulta.proximoSeguimiento);
+        const nextDay = normalizeSeguimientoCalendarDay(proximoSeguimientoGuardar) || "";
         if (
           consulta.googleCalendarEventId &&
           isGCalConnected() &&
-          nextSeg &&
-          nextSeg !== prevSeg
+          nextDay &&
+          nextDay !== prevDay
         ) {
           const merged = { ...consulta, ...dataToSave };
-          const syncRes = await syncConsultaProximoSeguimientoToGoogle(merged, nextSeg);
+          const syncRes = await syncConsultaProximoSeguimientoToGoogle(merged, nextDay);
           if (!syncRes.ok && !syncRes.skipped) {
             console.error("Google Calendar sync failed:", syncRes.error);
             toast.error("No se pudo actualizar el evento en Google Calendar");
@@ -198,7 +201,7 @@ export default function ConsultaForm({ open, onOpenChange, consulta, onSave }) {
         const created = await api.entities.Consulta.create(dataToSave);
         toast.success("Consulta / lead creada");
 
-        if (syncGCal && isGCalConnected() && formData.proximoSeguimiento) {
+        if (syncGCal && isGCalConnected() && proximoSeguimientoGuardar) {
           try {
             const calPayload = buildConsultaCalendarPayload(
               { ...dataToSave, contactoNombre: contacto?.nombre },
@@ -206,7 +209,7 @@ export default function ConsultaForm({ open, onOpenChange, consulta, onSave }) {
             );
             const event = await createCalendarEvent({
               ...calPayload,
-              date: formData.proximoSeguimiento,
+              date: proximoSeguimientoGuardar,
             });
             await api.entities.Consulta.update(created.id, { googleCalendarEventId: event.id });
             toast.success("Evento creado en Google Calendar");

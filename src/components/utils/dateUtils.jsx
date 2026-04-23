@@ -1,5 +1,23 @@
 // Utilidades para manejo de fechas
 
+/**
+ * Convierte proximoSeguimiento (YYYY-MM-DD, ISO con hora, etc.) a YYYY-MM-DD
+ * para comparar y enviar a Google Calendar sin depender del huso horario del string.
+ */
+export function normalizeSeguimientoCalendarDay(value) {
+  if (value == null || value === '') return '';
+  const s = String(value).trim();
+  const head = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (head) return head[1];
+  const t = Date.parse(s);
+  if (Number.isNaN(t)) return '';
+  const d = new Date(t);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 export function getNextBusinessDay(startDate, businessDaysToAdd) {
   let currentDate = new Date(startDate);
   let daysCount = 0;
