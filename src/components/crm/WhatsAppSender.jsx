@@ -158,11 +158,11 @@ export default function WhatsAppSender({ open, onOpenChange, consulta, onMessage
       }
     }
 
-    await api.entities.Consulta.update(consulta.id, updates);
+    const updated = await api.entities.Consulta.update(consulta.id, updates);
 
     const nuevaFecha = updates.proximoSeguimiento;
     const syncRes = await syncConsultaProximoSeguimientoToGoogle(
-      { ...consulta, ...updates },
+      { ...consulta, ...updated },
       nuevaFecha
     );
     if (!syncRes.ok && !syncRes.skipped) {
