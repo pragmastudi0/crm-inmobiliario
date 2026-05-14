@@ -149,9 +149,9 @@ export default function Consultas() {
 
   const handleSeguimiento = async (consulta, dias) => {
     const fecha = moment().add(dias, 'days').format("YYYY-MM-DD");
-    await updateMutation.mutateAsync({ id: consulta.id, data: { proximoSeguimiento: fecha } });
+    const updated = await updateMutation.mutateAsync({ id: consulta.id, data: { proximoSeguimiento: fecha } });
     const syncRes = await syncConsultaProximoSeguimientoToGoogle(
-      { ...consulta, proximoSeguimiento: fecha },
+      { ...consulta, ...updated, proximoSeguimiento: fecha },
       fecha
     );
     if (!syncRes.ok && !syncRes.skipped) {

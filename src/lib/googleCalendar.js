@@ -1,7 +1,9 @@
 import { GOOGLE_CALENDAR_OAUTH_CLIENT_ID } from '@/lib/googleCalendarClientId';
 import { normalizeSeguimientoCalendarDay } from '@/components/utils/dateUtils';
 
-const SCOPES = 'https://www.googleapis.com/auth/calendar.events';
+/** calendar.events: crear/editar eventos. userinfo.email: leer email en oauth2/v2/userinfo (evita 401 con solo calendar). */
+const SCOPES =
+  'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/userinfo.email';
 
 const TOKEN_KEY = 'gcal_token';
 const TOKEN_EXPIRY_KEY = 'gcal_token_expiry';

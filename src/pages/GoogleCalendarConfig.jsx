@@ -122,7 +122,8 @@ export default function GoogleCalendarConfig() {
             </CardTitle>
             <CardDescription>
               Conectá tu cuenta de Google para crear eventos de seguimiento automáticamente. La sesión se
-              renueva en segundo plano cuando es posible.
+              renueva en segundo plano cuando es posible. Si actualizamos permisos, volvé a conectar una vez
+              para incluir el email de la cuenta de Google.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
