@@ -13,7 +13,11 @@ import { User, Search, Calendar, Plus, CalendarSync } from "lucide-react";
 import moment from "moment";
 import { getNextBusinessDay, normalizeSeguimientoCalendarDay } from "@/components/utils/dateUtils";
 import { Checkbox } from "@/components/ui/checkbox";
-import { isGoogleCalendarConnected as isGCalConnected, createCalendarEvent } from "@/lib/googleCalendar";
+import {
+  getClientId,
+  createCalendarEvent,
+  getAccessTokenForCalendar,
+} from "@/lib/googleCalendar";
 import { buildConsultaCalendarPayload, syncConsultaProximoSeguimientoToGoogle } from "@/lib/syncConsultaGoogleCalendar";
 
 const CANALES_DEFAULT = [
@@ -40,7 +44,10 @@ export default function ConsultaForm({ open, onOpenChange, consulta, onSave }) {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [syncGCal, setSyncGCal] = useState(false);
-  const { workspace } = useWorkspace();
+  const { workspace, googleCalendarConnected, googleCalendarHadLinked } = useWorkspace();
+
+  const showGcalCheckbox =
+    !!getClientId() && (googleCalendarConnected || googleCalendarHadLinked);
 
   const { data: etapas = [] } = useQuery({
     queryKey: ['pipeline-stages', workspace?.id],
@@ -179,7 +186,7 @@ export default function ConsultaForm({ open, onOpenChange, consulta, onSave }) {
         const nextDay = normalizeSeguimientoCalendarDay(proximoSeguimientoGuardar) || "";
         if (
           consulta.googleCalendarEventId &&
-          isGCalConnected() &&
+          (await getAccessTokenForCalendar()) &&
           nextDay &&
           nextDay !== prevDay
         ) {
@@ -201,7 +208,7 @@ export default function ConsultaForm({ open, onOpenChange, consulta, onSave }) {
         const created = await api.entities.Consulta.create(dataToSave);
         toast.success("Consulta / lead creada");
 
-        if (syncGCal && isGCalConnected() && proximoSeguimientoGuardar) {
+        if (syncGCal && (await getAccessTokenForCalendar()) && proximoSeguimientoGuardar) {
           try {
             const calPayload = buildConsultaCalendarPayload(
               { ...dataToSave, contactoNombre: contacto?.nombre },
@@ -447,7 +454,7 @@ export default function ConsultaForm({ open, onOpenChange, consulta, onSave }) {
                 </div>
               )}
 
-              {!consulta && isGCalConnected() && (
+              {!consulta && showGcalCheckbox && (
                 <div className="col-span-2 flex items-center gap-3 p-3 bg-slate-50 rounded-xl border">
                   <Checkbox
                     id="syncGCal"

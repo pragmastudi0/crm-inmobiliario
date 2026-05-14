@@ -43,6 +43,8 @@ export const AuthProvider = ({ children }) => {
         isPlatformAdmin: profile?.is_platform_admin ?? false,
         consulta_follow_up_days: profile?.consulta_follow_up_days,
         postventa_follow_up_days: profile?.postventa_follow_up_days,
+        googleCalendarEmail: profile?.google_calendar_email ?? null,
+        googleCalendarLinkedAt: profile?.google_calendar_linked_at ?? null,
       });
       setIsAuthenticated(true);
       setAuthError(null);
@@ -108,6 +110,8 @@ export const AuthProvider = ({ children }) => {
         isPlatformAdmin: profile?.is_platform_admin ?? false,
         consulta_follow_up_days: profile?.consulta_follow_up_days,
         postventa_follow_up_days: profile?.postventa_follow_up_days,
+        googleCalendarEmail: profile?.google_calendar_email ?? null,
+        googleCalendarLinkedAt: profile?.google_calendar_linked_at ?? null,
       });
       setIsAuthenticated(true);
     } else {
@@ -115,6 +119,30 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(false);
     }
     setIsLoadingAuth(false);
+  };
+
+  const refreshProfile = async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session?.user) return;
+    const { data: profile } = await supabase
+      .from(TBL.profiles)
+      .select('*')
+      .eq('id', session.user.id)
+      .eq('app_slug', CRM_APP_SLUG)
+      .maybeSingle();
+    if (!profile) return;
+    setUser({
+      id: session.user.id,
+      email: session.user.email,
+      full_name: profile?.full_name,
+      isPlatformAdmin: profile?.is_platform_admin ?? false,
+      consulta_follow_up_days: profile?.consulta_follow_up_days,
+      postventa_follow_up_days: profile?.postventa_follow_up_days,
+      googleCalendarEmail: profile?.google_calendar_email ?? null,
+      googleCalendarLinkedAt: profile?.google_calendar_linked_at ?? null,
+    });
   };
 
   return (
@@ -129,6 +157,7 @@ export const AuthProvider = ({ children }) => {
         logout,
         navigateToLogin,
         checkAppState,
+        refreshProfile,
       }}
     >
       {children}

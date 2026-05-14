@@ -11,17 +11,57 @@ import {
   connect,
   disconnect,
   getClientId,
+  isGoogleCalendarConnected,
 } from "@/lib/googleCalendar";
+import { supabase } from "@/api/supabaseClient";
+import { CRM_APP_SLUG, TBL } from "@/api/entityApi";
+import { useAuth } from "@/lib/AuthContext";
+import { useWorkspace } from "@/components/context/WorkspaceContext";
 
 export default function GoogleCalendarConfig() {
+  const { user, refreshProfile } = useAuth();
+  const { refetchWorkspace } = useWorkspace();
   const [connected, setConnected] = useState(false);
   const [email, setEmail] = useState("");
   const [connecting, setConnecting] = useState(false);
 
   useEffect(() => {
-    setConnected(isConnected());
-    setEmail(getConnectedEmail());
-  }, []);
+    setConnected(isGoogleCalendarConnected());
+    setEmail(user?.googleCalendarEmail || getConnectedEmail() || "");
+  }, [user?.googleCalendarEmail]);
+
+  const persistProfileCalendar = async (googleEmail) => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session?.user) return;
+    const emailToStore = googleEmail || session.user.email || null;
+    const { error } = await supabase
+      .from(TBL.profiles)
+      .update({
+        google_calendar_email: emailToStore,
+        google_calendar_linked_at: new Date().toISOString(),
+      })
+      .eq("id", session.user.id)
+      .eq("app_slug", CRM_APP_SLUG);
+    if (error) throw error;
+  };
+
+  const clearProfileCalendar = async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session?.user) return;
+    const { error } = await supabase
+      .from(TBL.profiles)
+      .update({
+        google_calendar_email: null,
+        google_calendar_linked_at: null,
+      })
+      .eq("id", session.user.id)
+      .eq("app_slug", CRM_APP_SLUG);
+    if (error) throw error;
+  };
 
   const handleConnect = async () => {
     if (!getClientId()) {
@@ -31,8 +71,11 @@ export default function GoogleCalendarConfig() {
     setConnecting(true);
     try {
       const result = await connect();
+      await persistProfileCalendar(result.email);
+      await refreshProfile();
+      await refetchWorkspace?.();
       setConnected(true);
-      setEmail(result.email);
+      setEmail(result.email || user?.googleCalendarEmail || getConnectedEmail() || "");
       toast.success("Conectado a Google Calendar");
     } catch (err) {
       toast.error(err.message || "Error al conectar con Google");
@@ -41,11 +84,18 @@ export default function GoogleCalendarConfig() {
     }
   };
 
-  const handleDisconnect = () => {
-    disconnect();
-    setConnected(false);
-    setEmail("");
-    toast.success("Desconectado de Google Calendar");
+  const handleDisconnect = async () => {
+    try {
+      disconnect();
+      await clearProfileCalendar();
+      await refreshProfile();
+      await refetchWorkspace?.();
+      setConnected(false);
+      setEmail("");
+      toast.success("Desconectado de Google Calendar");
+    } catch (err) {
+      toast.error(err.message || "Error al desconectar");
+    }
   };
 
   return (
@@ -64,7 +114,6 @@ export default function GoogleCalendarConfig() {
           </p>
         </div>
 
-        {/* Estado de conexión */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -72,7 +121,8 @@ export default function GoogleCalendarConfig() {
               Estado de conexión
             </CardTitle>
             <CardDescription>
-              Conectá tu cuenta de Google para crear eventos de seguimiento automáticamente
+              Conectá tu cuenta de Google para crear eventos de seguimiento automáticamente. La sesión se
+              renueva en segundo plano cuando es posible.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -82,9 +132,7 @@ export default function GoogleCalendarConfig() {
                   <CheckCircle2 className="w-5 h-5 text-green-600" />
                   <div>
                     <p className="font-medium text-green-900">Conectado</p>
-                    {email && (
-                      <p className="text-sm text-green-700">{email}</p>
-                    )}
+                    {email && <p className="text-sm text-green-700">{email}</p>}
                   </div>
                 </div>
                 <Button variant="outline" size="sm" onClick={handleDisconnect}>
@@ -99,6 +147,8 @@ export default function GoogleCalendarConfig() {
                     <p className="font-medium text-slate-700">No conectado</p>
                     <p className="text-sm text-slate-500">
                       Conectá tu cuenta de Google para sincronizar
+                      {(user?.googleCalendarEmail || user?.googleCalendarLinkedAt) &&
+                        " (tu cuenta quedó registrada; si ya autorizaste antes, podés volver a conectar)."}
                     </p>
                   </div>
                 </div>
@@ -115,7 +165,6 @@ export default function GoogleCalendarConfig() {
           </CardContent>
         </Card>
 
-        {/* Instrucciones */}
         <Card>
           <CardHeader>
             <CardTitle>¿Cómo funciona?</CardTitle>
@@ -124,20 +173,18 @@ export default function GoogleCalendarConfig() {
             <ol className="list-decimal list-inside space-y-2 text-sm text-slate-600">
               <li>Hacé clic en &quot;Conectar con Google&quot; y autorizá el acceso</li>
               <li>
-                Al crear una nueva consulta / lead, marcá la opción
-                &quot;Sincronizar con Google Calendar&quot;
+                Al crear una nueva consulta / lead, marcá la opción &quot;Sincronizar con Google
+                Calendar&quot;
               </li>
               <li>
-                Se creará automáticamente un evento en tu Google Calendar con la fecha de
-                seguimiento del lead
+                Se creará automáticamente un evento en tu Google Calendar con la fecha de seguimiento
+                del lead
               </li>
             </ol>
           </CardContent>
         </Card>
 
-        <div className="text-center text-sm text-slate-400 py-4">
-          PRAGMA CRM - Rubro Inmobiliario
-        </div>
+        <div className="text-center text-sm text-slate-400 py-4">PRAGMA CRM - Rubro Inmobiliario</div>
       </div>
     </div>
   );
